@@ -10,6 +10,7 @@ import UIKit
 // 1პროტოკოლი უკან მონაცემების დასაბრუნებლად (Delegation)
 protocol NoteDetailDelegate: AnyObject {
     func didSave(title: String, content: String, at index: Int?)
+    func didDelete(at index: Int)
 }
 
 class NoteDetailViewController: UIViewController {
@@ -28,8 +29,26 @@ class NoteDetailViewController: UIViewController {
         
         setupUI()
         
-        // ზედა მარჯვენა კუთხეში პროგრამულად ვსვამთ შენახვის ღილაკს
-        navigationItem.rightBarButtonItem = UIBarButtonItem(title: "Save", style: .done, target: self, action: #selector(didTapSave))
+        //  შენახვის ღილაკს
+        let saveButton = UIBarButtonItem(title: "Save", style: .done, target: self, action: #selector(didTapSave))
+        
+        if noteIndex != nil {
+                let deleteButton = UIBarButtonItem(barButtonSystemItem: .trash, target: self, action: #selector(didTapDelete))
+                deleteButton.tintColor = .systemRed
+                navigationItem.rightBarButtonItems = [saveButton, deleteButton]
+            } else {
+                navigationItem.rightBarButtonItem = saveButton
+            }
+    }
+    
+    @objc private func didTapDelete() {
+        guard let index = noteIndex else { return }
+        
+        // შევატყობინოთ დელეგატს, რომ ეს ინდექსი წაიშალოს
+        delegate?.didDelete(at: index)
+        
+        // დავბრუნდეთ უკან
+        navigationController?.popViewController(animated: true)
     }
     
     private func setupUI() {
@@ -54,6 +73,8 @@ class NoteDetailViewController: UIViewController {
         navigationController?.popViewController(animated: true)
         
     }
+    
+    
     
     
 }
