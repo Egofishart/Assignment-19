@@ -7,25 +7,31 @@
 
 import UIKit
 
-// MARK: - Main Class
 class ViewController: UIViewController {
-    let defaults =  UserDefaults.standard
+
     @IBOutlet var collectionView: UICollectionView!
     @IBOutlet var label: UILabel!
-    
-    var models: [Note] = []
-    
+
+    private let viewModel = NotesViewModel()
+
     override func viewDidLoad() {
         super.viewDidLoad()
         
         collectionView.delegate = self
         collectionView.dataSource = self
         title = "Notes"
-        loadNotes()
         
         navigationItem.rightBarButtonItem = UIBarButtonItem(barButtonSystemItem: .add, target: self, action: #selector(didTapNewNote))
+        
+        bindViewModel()
     }
-    
+
+    func bindViewModel() {
+        viewModel.refreshUI = { [weak self] in
+            self?.collectionView.reloadData()
+        }
+    }
+
     @objc private func didTapNewNote() {
         let storyboard = UIStoryboard(name: "NoteDetail", bundle: nil)
         guard let vc = storyboard.instantiateViewController(withIdentifier: "NoteDetailViewController") as? NoteDetailViewController else {
@@ -35,36 +41,24 @@ class ViewController: UIViewController {
         vc.title = "New Note"
         vc.delegate = self
         
+        //  ახალი ნოუთის შექმნისას
+        vc.viewModel = NoteDetailViewModel()
+        
         navigationController?.pushViewController(vc, animated: true)
     }
-    
-    func saveNotes() {
-        let data = try? JSONEncoder().encode(models)
-        defaults.set(data, forKey: "savedNotes")
-        defaults.synchronize()
-    }
-    
-    func loadNotes() {
-        guard let data = defaults.data(forKey: "savedNotes") else { return }
-        if let decodedNotes = try? JSONDecoder().decode([Note].self, from: data) {
-            models = decodedNotes
-            collectionView.reloadData()
-        }
-    }
 }
-
 
 // MARK: - CollectionView Data Source
 extension ViewController: UICollectionViewDataSource {
     
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
-        return models.count
+        return viewModel.notes.count
     }
 
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
         let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "NoteCell", for: indexPath) as! CollectionViewCell
         
-        let currentNote = models[indexPath.row]
+        let currentNote = viewModel.notes[indexPath.row]
         cell.titleLabel.text = currentNote.title
         cell.contentLabel.text = currentNote.content
         
@@ -75,8 +69,8 @@ extension ViewController: UICollectionViewDataSource {
     }
 }
 
-// MARK: - CollectionView Delegate
-extension ViewController: UICollectionViewDelegate {
+// MARK: - CollectionView Delegate & FlowLayout
+extension ViewController: UICollectionViewDelegate, UICollectionViewDelegateFlowLayout {
     
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
         let storyboard = UIStoryboard(name: "NoteDetail", bundle: nil)
@@ -86,8 +80,9 @@ extension ViewController: UICollectionViewDelegate {
         
         vc.title = "Edit Note"
         vc.delegate = self
-        vc.selectedNote = models[indexPath.row]
-        vc.noteIndex = indexPath.row
+        
+        //  არსებული ნოტის რედაქტირებისა
+        vc.viewModel = NoteDetailViewModel(selectedNote: viewModel.notes[indexPath.row], noteIndex: indexPath.row)
         
         navigationController?.pushViewController(vc, animated: true)
     }
@@ -102,24 +97,10 @@ extension ViewController: UICollectionViewDelegate {
 extension ViewController: NoteDetailDelegate {
     
     func didSave(title: String, content: String, at index: Int?) {
-        if let index = index {
-            models[index].title = title
-            models[index].content = content
-        } else {
-            let newNote = Note(title: title, content: content)
-            models.append(newNote)
-        }
-        saveNotes()
-        collectionView.reloadData()
+        viewModel.addOrUpdateNote(title: title, content: content, at: index)
     }
     
     func didDelete(at index: Int) {
-            models.remove(at: index)    // 1. ამოვიღოთ მასივიდან
-              saveNotes()                 // 2. შევინახოთ userdefault
-            collectionView.reloadData() // 3. გავაახლოთ ეკრანი
-        }
-    
-    
-    
+        viewModel.deleteNote(at: index)
     }
-
+}
